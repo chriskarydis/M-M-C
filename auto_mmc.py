@@ -7,12 +7,16 @@ import random
 
 class MMcQueue:
     def __init__(self, env, arrival_rate, service_rate, num_servers):
+        # Initialize the MMcQueue class
         self.env = env
         self.arrival_rate = arrival_rate
         self.service_rate = service_rate
         self.num_servers = num_servers
+        # Create a queue for customers
         self.queue = simpy.Store(env)
+        # Create resources for servers
         self.servers = [simpy.Resource(env, capacity=1) for _ in range(num_servers)]
+        # Initialize metrics variables
         self.total_wait_time = 0
         self.total_customers_served = 0
         self.total_queue_length = 0
@@ -20,36 +24,47 @@ class MMcQueue:
         self.max_queue_length = 0
         self.total_system_time = 0
         self.customers_in_system = [0]
+        # Start the server processes
         for i in range(num_servers):
             self.env.process(self.server_process())
 
     def arrival_process(self):
+        # Process for customer arrivals
         customer_id = 0
         while True:
+            # Generate customer arrivals based on exponential distribution
             yield self.env.timeout(random.expovariate(self.arrival_rate))
             customer_id += 1
             print(f"Customer {customer_id} arrives at time {self.env.now}")
+            # Start processing the arrived customer
             self.env.process(self.customer(customer_id))
+            # Update queue length and time metrics
             self.total_queue_length += len(self.queue.items)
             self.total_time += self.env.now
             self.max_queue_length = max(self.max_queue_length, len(self.queue.items))
             self.customers_in_system.append(len(self.queue.items) + 1)
 
     def customer(self, customer_id):
+        # Process for each customer
         arrival_time = self.env.now
         print(f"Customer {customer_id} enters the queue at time {self.env.now}. Queue length: {len(self.queue.items) + 1}")
         yield self.queue.put((arrival_time, customer_id))
 
     def server_process(self):
+        # Process for server operations
         while True:
+            # Get the next customer from the queue
             arrival_time, customer_id = yield self.queue.get()
             server_index = self.get_available_server()
+            # Request server for processing
             with self.servers[server_index].request() as req:
                 yield req
                 print(f"Customer {customer_id} starts service at time {self.env.now} with Server {server_index + 1}. Queue length: {len(self.queue.items)}")
+                # Generate service time based on exponential distribution
                 service_time = random.expovariate(self.service_rate)
                 yield self.env.timeout(service_time)
-                self.customers_in_system.append(len(self.queue.items))  # Add this line
+                # Update metrics after service completion
+                self.customers_in_system.append(len(self.queue.items)) 
                 self.total_system_time += self.env.now - arrival_time
                 self.total_wait_time += self.env.now - arrival_time - service_time
                 self.total_customers_served += 1
@@ -59,12 +74,14 @@ class MMcQueue:
                 print(f"Customer {customer_id} finishes service at time {self.env.now}.")
 
     def get_available_server(self):
+        # Find an available server
         for i in range(self.num_servers):
             if self.servers[i].count == 0:
                 return i
         return None  # If all servers are busy, return None
 
 def calculate_performance_metrics(c, l, m):
+    # Calculate theoretical performance metrics
     r = l / (c * m)
     if r >= 1:
         raise ValueError("The ratio of arrival rate to service rate must not be 1 or more when the number of servers is taken into account. The ratio of arrival rate to service is calculated by the following formula: {Number_of_servers / (arrival_rate * service_rate)}")
@@ -83,6 +100,7 @@ def simulate_queue(arrival_rate, service_rate, num_servers, sim_time, idx):
     queue = MMcQueue(env, arrival_rate, service_rate, num_servers)
     env.process(queue.arrival_process())
     env.run(until=sim_time)
+    # Calculate simulation metrics
     avg_wait_time = queue.total_wait_time / queue.total_customers_served
     avg_queue_length = queue.total_queue_length / queue.total_time
     avg_system_time = queue.total_system_time / queue.total_customers_served
@@ -90,7 +108,8 @@ def simulate_queue(arrival_rate, service_rate, num_servers, sim_time, idx):
     
     if(avg_wait_time < 0):
         avg_wait_time = 0
-        
+
+    # Print simulation metrics    
     print("The Simulation Values are:")
     print("     Average System Time:", avg_system_time)
     print("     Average Wait Time in the Queue:", avg_wait_time)
@@ -100,9 +119,10 @@ def simulate_queue(arrival_rate, service_rate, num_servers, sim_time, idx):
     print("     Average Customers in System:", avg_customers_in_system)
     print("     Total Time:", queue.total_time)
 
+    # Create a prefix for the output files
     prefix = "{:.2f},".format((idx + 1) * 0.05)
 
-    # Write the values to the files
+    # Write the simulation values to files
     with open('T_R.txt', 'a') as t_r_file:
         t_r_file.write(prefix + str(avg_system_time) + ',')
 
@@ -130,9 +150,9 @@ avg_customers_in_systems = []
 total_times = []
 
 # Define list of mean arriving time intervals
-l_values = [20.00, 10.00, 6.66, 5.00, 4.00, 3.33, 2.86, 2.50, 2.22, 2.00, 1.82, 1.66, 1.54, 1.43, 1.33, 1.25, 1.18, 1.11, 1.05]  # Example list
+l_values = [20.00, 10.00, 6.66, 5.00, 4.00, 3.33, 2.86, 2.50, 2.22, 2.00, 1.82, 1.66, 1.54, 1.43, 1.33, 1.25, 1.18, 1.11, 1.05]  
 
-
+# Inputs
 print("#Have in mind that the ratio of arrival rate to service rate must not be 1 or more when the number of servers is taken into account.#\n#The ratio of arrival rate to service is calculated by the following formula: {Number_of_servers / (arrival_rate * service_rate)}#\n#The arrival rates are the following: [20.00, 10.00, 6.66, 5.00, 4.00, 3.33, 2.86, 2.50, 2.22, 2.00, 1.82, 1.66, 1.54, 1.43, 1.33, 1.25, 1.18, 1.11, 1.05]#\n")
 service_rate = float(input("Enter service rate (customers per time unit): "))  
 num_servers = int(input("Enter number of servers: "))  
@@ -149,9 +169,12 @@ with open('T_R.txt', 'w') as t_r_file, \
 # Run the simulation for each arrival rate in l_values
 idx = 0
 for arrival_rate in l_values:
+    # Iterate over each arrival rate in the list
     print(f"\nRunning simulation for arrival rate: {arrival_rate}")
+    # Run simulation for the current arrival rate
     results = simulate_queue(arrival_rate, service_rate, num_servers, sim_time, idx)
     idx += 1 
+    # Record simulation results
     avg_system_times.append(results[0])
     avg_wait_times.append(results[1])
     avg_queue_lengths.append(results[2])
@@ -160,8 +183,10 @@ for arrival_rate in l_values:
     avg_customers_in_systems.append(results[5])
     total_times.append(results[6])
 
+    # Calculate theoretical performance metrics
     N, T, Nq, Tq = calculate_performance_metrics(num_servers, arrival_rate, service_rate)
     
+    # Ensure non-negative theoretical wait time
     if(Tq<0):
         Tq=0
 
@@ -171,6 +196,7 @@ for arrival_rate in l_values:
     print("     Average Queue Length:", Nq)
     print("     Total Customers Served:", N)
 
+    # Write theoretical values to files
     with open('T_R.txt', 'a') as f:
         f.write(str(T) + '\n')
 
@@ -192,6 +218,7 @@ avg_customers_served = sum(total_customers_served) / len(total_customers_served)
 avg_customers_in_system = sum(avg_customers_in_systems) / len(avg_customers_in_systems)
 avg_total_time = sum(total_times) / len(total_times)
 
+# Print the average of the results
 print("\nThe Average Simulation Values are:")
 print("     Average System Time:", avg_system_time)
 print("     Average Wait Time in the Queue:", avg_wait_time)
